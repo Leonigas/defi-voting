@@ -56,8 +56,12 @@ contract Voting is Ownable {
     }
     
     // TODO remove this (only DEBUG)
-    function getAddresses() public view returns(address[] memory){
+    function getAddresses() external view returns(address[] memory){
         return addresses;
+    }
+
+    function isOwner() external view returns (bool){
+        return owner() == _msgSender();
     }
 
     function tally() external onlyOwner {
@@ -122,6 +126,14 @@ contract Voting is Ownable {
         emit ProposalRegistered(proposalId);
     }
     
+    function startVotersregistration() external onlyOwner {
+        require(status != WorkflowStatus.RegisteringVoters, "Registration already started");
+        WorkflowStatus previousStatus = status;
+        status = WorkflowStatus.ProposalsRegistrationStarted;
+        emit WorkflowStatusChange(previousStatus, status);
+        emit ProposalsRegistrationStarted();
+    }
+
     function startProposalregistration() external onlyOwner {
         require(status != WorkflowStatus.ProposalsRegistrationStarted, "Registration already started");
         require(status == WorkflowStatus.RegisteringVoters, "You can only register proposals after voter registration");
