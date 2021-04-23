@@ -10,16 +10,25 @@ import getWeb3 from "./getWeb3";
 
 import "./App.css";
 
+export const STATUS = {
+  REG_VOTERS: 0,
+  REG_PROPOSALS: 1,
+  END_REG: 2,
+  VOTING: 3,
+  END_VOTING: 4,
+  TALLY: 5,
+}
+
 class App extends Component {
   state = { web3: null, accounts: null, contract: null, voters: null };
 
   enumStatus = [
-    { name: "Registering Voters", color: "green" },
-    { name: "Proposals Registration Started", color: "green" },
-    { name: "Proposals Registration Ended", color: "green" },
-    { name: "Voting Session Started", color: "green" },
-    { name: "Voting Session Ended", color: "green" },
-    { name: "Votes Tallied", color: "green" }
+    { name: "Enregistrement des électeurs", color: "#696969" },
+    { name: "Enregistrement des propositions", color: "#6495ED" },
+    { name: "Fin des propositions", color: "#008B8B" },
+    { name: "Début du vote", color: "#2F4F4F" },
+    { name: "Fin du vote", color: "#191970" },
+    { name: "Décompte fait", color: "#006400" }
   ];
 
   componentDidMount = async () => {
@@ -51,26 +60,17 @@ class App extends Component {
   };
 
   runInit = async () => {
-    const { accounts, contract } = this.state;
+    const { contract } = this.state;
 
     // récupérer la liste des comptes autorisés
     const voters = await contract.methods.getAddresses().call();
     const status = await contract.methods.status().call()
     const statusName = this.enumStatus[status].name
     const statusColor = this.enumStatus[status].color
-    const isOwner = await contract.methods.isOwner().call();
-    const owner_add = await contract.methods.owner().call();
-
-    await contract.methods.isOwner().call((err, is_owner) => 
-    {
-      console.log(is_owner)
-      return is_owner;
-    });
-
-    console.log(isOwner, accounts[0], owner_add, accounts[0] === owner_add);
+    const ownerAddress = await contract.methods.owner().call();
     
     // Mettre à jour le state 
-    this.setState({ voters: voters, statusName: statusName, statusColor: statusColor, isOwner: isOwner });
+    this.setState({ voters: voters, status: status, statusName: statusName, statusColor: statusColor, ownerAddress: ownerAddress });
   }
 
   registerVoter = async () => {
@@ -83,22 +83,48 @@ class App extends Component {
     this.runInit();
   }
 
-  startProposalregistration = async() => {
-    const { accounts, contract } = this.state;
-    await contract.methods.startProposalregistration().send({from: accounts[0]});
+  nextStatus = async() => {
+    const { accounts, contract, status } = this.state;
+
+    console.log("STATUS : " , parseInt(status) , STATUS.END_REG)
+
+    switch(parseInt(status)) {
+      case STATUS.REG_VOTERS:
+        await contract.methods.startProposalregistration().send({from: accounts[0]});
+        break;
+      case STATUS.REG_PROPOSALS:
+          await contract.methods.endProposalregistration().send({from: accounts[0]});
+          break;
+      case STATUS.END_REG:
+        await contract.methods.startVotingSession().send({from: accounts[0]});
+        break;
+      case STATUS.VOTING:
+        await contract.methods.endVotingSession().send({from: accounts[0]});
+        break;
+      case STATUS.END_VOTING:
+          await contract.methods.tally().send({from: accounts[0]});
+          break;
+      case STATUS.TALLY:
+        await contract.methods.startVotersregistration().send({from: accounts[0]});
+        break;
+      default:
+        break;
+    }
 
     this.runInit();
   }
 
   render() {
-    const { voters, statusColor, statusName, isOwner} = this.state;
+    const { accounts, status, voters, statusColor, statusName, ownerAddress } = this.state;
 
-    if (isOwner) {
+    if (accounts && accounts[0] === ownerAddress) {
       return (
         <div className="App">
-          <span style={{display: 'flex', justifyContent: 'center', padding: "5px", color: "white", border: "1px solid green", backgroundColor: statusColor}}>
-            { statusName }
-          </span>
+          <div style={{display: 'flex', justifyContent: 'center', color: "white", border: "1px solid "+statusColor, backgroundColor: statusColor}}>
+            <span style={{padding: "5px"}}>{ status + ' - ' + statusName }</span>
+            <Button style={{padding: "5px"}} onClick={ this.nextStatus } variant="light" > Suivant </Button>
+          </div>
+
           <div>
               <h2 className="text-center">Système de vote</h2>
               <hr></hr>
@@ -128,7 +154,7 @@ class App extends Component {
             </Card>
           </div>
           <br></br>
-          <div style={{display: 'flex', justifyContent: 'center'}}>
+          { parseInt(status) === STATUS.REG_VOTERS && (<div style={{display: 'flex', justifyContent: 'center'}}>
             <Card style={{ width: '50rem' }}>
               <Card.Header><strong>Autoriser un nouveau compte</strong></Card.Header>
               <Card.Body>
@@ -140,15 +166,7 @@ class App extends Component {
                 <Button onClick={ this.registerVoter } variant="dark" > Autoriser </Button>
               </Card.Body>
             </Card>
-            </div>
-            <div style={{display: 'flex', justifyContent: 'center'}}>
-              <Card style={{ width: '50rem' }}>
-                <Card.Header><strong>Commencer la session d'enregistrement de la proposition.</strong></Card.Header>
-                <Card.Body>
-                  <Button onClick={ this.startProposalregistration } variant="dark" > Démarrer </Button>
-                </Card.Body>
-              </Card>
-            </div>
+          </div>) }
           <br></br>
         </div>
       );

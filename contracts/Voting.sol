@@ -29,6 +29,7 @@ contract Voting is Ownable {
     uint private nonce = 0;
     WorkflowStatus public status = WorkflowStatus.RegisteringVoters;
 
+    event RegisteringVotersStarted();
     event VoterRegistered(address voterAddress);
     event ProposalsRegistrationStarted();
     event ProposalsRegistrationEnded();
@@ -129,9 +130,9 @@ contract Voting is Ownable {
     function startVotersregistration() external onlyOwner {
         require(status != WorkflowStatus.RegisteringVoters, "Registration already started");
         WorkflowStatus previousStatus = status;
-        status = WorkflowStatus.ProposalsRegistrationStarted;
+        status = WorkflowStatus.RegisteringVoters;
         emit WorkflowStatusChange(previousStatus, status);
-        emit ProposalsRegistrationStarted();
+        emit RegisteringVotersStarted();
     }
 
     function startProposalregistration() external onlyOwner {
