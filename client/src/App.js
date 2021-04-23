@@ -51,15 +51,24 @@ class App extends Component {
   };
 
   runInit = async () => {
-    const { contract } = this.state;
+    const { accounts, contract } = this.state;
 
     // récupérer la liste des comptes autorisés
     const voters = await contract.methods.getAddresses().call();
     const status = await contract.methods.status().call()
     const statusName = this.enumStatus[status].name
     const statusColor = this.enumStatus[status].color
-    const isOwner = true; // await contract.methods.isOwner().call();
+    const isOwner = await contract.methods.isOwner().call();
+    const owner_add = await contract.methods.owner().call();
 
+    await contract.methods.isOwner().call((err, is_owner) => 
+    {
+      console.log(is_owner)
+      return is_owner;
+    });
+
+    console.log(isOwner, accounts[0], owner_add, accounts[0] === owner_add);
+    
     // Mettre à jour le state 
     this.setState({ voters: voters, statusName: statusName, statusColor: statusColor, isOwner: isOwner });
   }
