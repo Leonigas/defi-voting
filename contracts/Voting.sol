@@ -61,8 +61,12 @@ contract Voting is Ownable {
         return addresses;
     }
 
-    function isOwner() external view returns (bool){
-        return owner() == _msgSender();
+    function getProposals() external view returns(bytes32[] memory){
+        bytes32[] memory arrayProposals = new bytes32[](_proposalIds.length);
+        for(uint i=0; i<_proposalIds.length; i++) {
+            arrayProposals[i] = keccak256(abi.encodePacked((_proposals[_proposalIds[i]].description)));
+        }        
+        return arrayProposals;
     }
 
     function tally() external onlyOwner {

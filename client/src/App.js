@@ -60,17 +60,25 @@ class App extends Component {
   };
 
   runInit = async () => {
-    const { contract } = this.state;
+    const { accounts, contract } = this.state;
 
-    // récupérer la liste des comptes autorisés
-    const voters = await contract.methods.getAddresses().call();
+    // récupérer les listes des votants et des propositions
+    const voters = await contract.methods.getAddresses().call() 
+    const proposals = await contract.methods.getProposals().call()
+
+    // données relatives à la phase en cours
     const status = await contract.methods.status().call()
     const statusName = this.enumStatus[status].name
     const statusColor = this.enumStatus[status].color
-    const ownerAddress = await contract.methods.owner().call();
-    
+
+    // données personnelles
+    const ownerAddress = await contract.methods.owner().call()
+    const voter = await contract.methods._voters(accounts[0]).call()
+
+    console.log(voter)
+
     // Mettre à jour le state 
-    this.setState({ voters: voters, status: status, statusName: statusName, statusColor: statusColor, ownerAddress: ownerAddress });
+    this.setState({ voters: voters, status: status, statusName: statusName, statusColor: statusColor, ownerAddress: ownerAddress, voter: voter, proposals: proposals})
   }
 
   registerVoter = async () => {
@@ -79,6 +87,16 @@ class App extends Component {
 
     // Interaction avec le smart contract pour ajouter un compte 
     await contract.methods.registerVoter(address).send({from: accounts[0]});
+    // Récupérer la liste des comptes autorisés
+    this.runInit();
+  }
+
+  registerProposal = async () => {
+    const { accounts, contract } = this.state;
+    const address = this.address.value;
+
+    // Interaction avec le smart contract pour ajouter un compte 
+    await contract.methods.registerProposal(address).send({from: accounts[0]});
     // Récupérer la liste des comptes autorisés
     this.runInit();
   }
@@ -115,7 +133,7 @@ class App extends Component {
   }
 
   render() {
-    const { accounts, status, voters, statusColor, statusName, ownerAddress } = this.state;
+    const { accounts, status, voters, statusColor, statusName, ownerAddress, voter, proposals } = this.state;
 
     if (accounts && accounts[0] === ownerAddress) {
       return (
@@ -176,7 +194,67 @@ class App extends Component {
       return <div>Loading Web3, accounts, and contract...</div>;
     }
 
-    return <div>You are not admin</div>;
+    return (
+      <div className="App">
+        <div style={{display: 'flex', justifyContent: 'center', color: "white", border: "1px solid "+statusColor, backgroundColor: statusColor}}>
+          <span style={{padding: "5px"}}>{ status + ' - ' + statusName }</span>
+        </div>
+
+        <div>
+          <h2 className="text-center">Système de vote</h2>
+          <hr></hr>
+          <br></br>
+        </div>
+
+        { parseInt(status) === STATUS.REG_VOTERS && (<div style={{display: 'flex', justifyContent: 'center'}}>
+            <p className="text-center text-warning">L'administrateur est en train d'enregister les électeurs. Revenez plus tard ...</p>
+            <Card style={{ width: '50rem' }}>
+              <Card.Header><strong>Entregistrement</strong></Card.Header>
+              <Card.Body>
+                { voter && voter.isRegistered && (<p className='bg-success'>Vous êtes enregistré !</p>)}
+                { !voter || !voter.isRegistered && (<p className='bg-danger'>Vous n'êtes pas encore enregistré.</p>)}
+              </Card.Body>
+            </Card>
+          </div>) }
+
+          { parseInt(status) === STATUS.REG_PROPOSALS && (<div><div style={{display: 'flex', justifyContent: 'center'}}>
+            <Card style={{ width: '50rem' }}>
+              <Card.Header><strong>Liste des propositions</strong></Card.Header>
+              <Card.Body>
+                <ListGroup variant="flush">
+                  <ListGroup.Item>
+                    <Table striped bordered hover>
+                      <thead>
+                        <tr>
+                          <th>@</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proposals !== null &&
+                          proposals.map((a) => <tr><td>{a}</td></tr>)
+                        }
+                      </tbody>
+                    </Table>
+                  </ListGroup.Item>
+                </ListGroup>
+              </Card.Body>
+            </Card>
+          </div>
+          <div style={{display: 'flex', justifyContent: 'center'}}>
+            <Card style={{ width: '50rem' }}>
+              <Card.Header><strong>Enregistrez votre proposition</strong></Card.Header>
+              <Card.Body>
+                <Form.Group controlId="formProposals">
+                  <Form.Control type="text" id="address"
+                  ref={(input) => { this.address = input }}
+                  />
+                </Form.Group>
+                <Button onClick={ this.registerProposal } variant="dark" > Enregistrer </Button>
+              </Card.Body>
+            </Card>
+          </div></div>) }
+      </div>
+    );
 
   }
 }
