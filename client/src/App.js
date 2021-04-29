@@ -63,8 +63,21 @@ class App extends Component {
     const { accounts, contract } = this.state;
 
     // récupérer les listes des votants et des propositions
-    const voters = await contract.methods.getAddresses().call() 
-    const proposals = await contract.methods.getProposals().call()
+    const voters = await contract.methods.getAddresses().call()  // TODO get _voters
+
+    console.log(voters)
+
+    // const proposals = await contract.methods.getProposals().call() // TODO get _proposals
+
+    // MOCK
+    const proposals = [{
+      'description': 'Macron',
+      'voteCount': 2
+    },
+    {
+      'description': 'Trump',
+      'voteCount': 1
+    }];
 
     // données relatives à la phase en cours
     const status = await contract.methods.status().call()
@@ -76,9 +89,12 @@ class App extends Component {
     const voter = await contract.methods._voters(accounts[0]).call()
 
     console.log(voter)
+    console.log("STATUS : " , parseInt(status) )
 
+    const winningProposalId = await contract.methods.winningProposalId().call();
+      
     // Mettre à jour le state 
-    this.setState({ voters: voters, status: status, statusName: statusName, statusColor: statusColor, ownerAddress: ownerAddress, voter: voter, proposals: proposals})
+    this.setState({ voters: voters, status: status, statusName: statusName, statusColor: statusColor, ownerAddress: ownerAddress, voter: voter, proposals: proposals, winningProposalId: winningProposalId})  
   }
 
   registerVoter = async () => {
@@ -95,12 +111,26 @@ class App extends Component {
     const { accounts, contract } = this.state;
     const address = this.address.value;
 
-    // Interaction avec le smart contract pour ajouter un compte 
     await contract.methods.registerProposal(address).send({from: accounts[0]});
-    // Récupérer la liste des comptes autorisés
     this.runInit();
   }
 
+  vote = async () => {
+    const { accounts, contract } = this.state;
+    const address = this.address.value;
+
+    await contract.methods.vote(address).send({from: accounts[0]});
+    this.runInit();
+  }
+
+  tally = async () => {
+    const { accounts, contract } = this.state;
+
+    await contract.methods.tally().send({from: accounts[0]});
+
+    this.runInit();
+  }
+  
   nextStatus = async() => {
     const { accounts, contract, status } = this.state;
 
@@ -133,7 +163,7 @@ class App extends Component {
   }
 
   render() {
-    const { accounts, status, voters, statusColor, statusName, ownerAddress, voter, proposals } = this.state;
+    const { accounts, status, voters, statusColor, statusName, ownerAddress, voter, proposals, winningProposalId } = this.state;
 
     if (accounts && accounts[0] === ownerAddress) {
       return (
@@ -148,6 +178,7 @@ class App extends Component {
               <hr></hr>
               <br></br>
           </div>
+          
           <div style={{display: 'flex', justifyContent: 'center'}}>
             <Card style={{ width: '50rem' }}>
               <Card.Header><strong>Liste des votants</strong></Card.Header>
@@ -185,6 +216,72 @@ class App extends Component {
               </Card.Body>
             </Card>
           </div>) }
+
+          { parseInt(status) === STATUS.REG_PROPOSALS || parseInt(status) === STATUS.VOTING && (<div><div style={{display: 'flex', justifyContent: 'center'}}>
+            <Card style={{ width: '50rem' }}>
+              <Card.Header><strong>Liste des propositions</strong></Card.Header>
+              <Card.Body>
+                <ListGroup variant="flush">
+                  <ListGroup.Item>
+                    <Table striped bordered hover>
+                      <thead>
+                        <tr>
+                          <th>Propositions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proposals !== null &&
+                          proposals.map((a) => <tr><td>{a.description}</td></tr>)
+                        }
+                      </tbody>
+                    </Table>
+                  </ListGroup.Item>
+                </ListGroup>
+              </Card.Body>
+            </Card>
+          </div></div>) }
+
+          { parseInt(status) === STATUS.END_VOTING && (<div><div style={{display: 'flex', justifyContent: 'center'}}>
+            <Card style={{ width: '50rem' }}>
+              <Card.Header><strong>Décompte</strong></Card.Header>
+              <Card.Body>
+                <ListGroup variant="flush">
+                  <ListGroup.Item>
+                    <Table striped bordered hover>
+                      <thead>
+                        <tr>
+                          <th>Propositions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proposals !== null &&
+                          proposals.map((a) => <tr><td>{a.description} - {a.voteCount}</td></tr>)
+                        }
+                      </tbody>
+                    </Table>
+                  </ListGroup.Item>
+                </ListGroup>
+              </Card.Body>
+            </Card>
+          </div>
+          <div style={{display: 'flex', justifyContent: 'center'}}>
+            <Card style={{ width: '50rem' }}>
+              <Card.Header><strong>Action</strong></Card.Header>
+              <Card.Body>
+                <Button onClick={ this.tally } variant="dark" > Faire le décompte ! </Button>
+              </Card.Body>
+            </Card>
+          </div></div>) }
+
+          { parseInt(status) === STATUS.TALLY && (<div>
+            <div style={{display: 'flex', justifyContent: 'center'}}>
+              <strong>Le gagnant est ...</strong>
+          </div>
+          <div style={{display: 'flex', justifyContent: 'center'}}>
+            <h1>{ winningProposalId }</h1>
+          </div>
+          </div>) }
+
           <br></br>
         </div>
       );
@@ -226,12 +323,12 @@ class App extends Component {
                     <Table striped bordered hover>
                       <thead>
                         <tr>
-                          <th>@</th>
+                          <th>Propositions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {proposals !== null &&
-                          proposals.map((a) => <tr><td>{a}</td></tr>)
+                          proposals.map((a) => <tr><td>{a.description}</td></tr>)
                         }
                       </tbody>
                     </Table>
@@ -253,6 +350,73 @@ class App extends Component {
               </Card.Body>
             </Card>
           </div></div>) }
+
+          { parseInt(status) === STATUS.END_REG && (<div style={{display: 'flex', justifyContent: 'center'}}>
+            <p className="text-center text-warning">L'enregistrement des propositions est terminé. Revenez plus tard ...</p>
+            <Card style={{ width: '50rem' }}>
+              <Card.Header><strong>Liste des propositions</strong></Card.Header>
+              <Card.Body>
+                <ListGroup variant="flush">
+                  <ListGroup.Item>
+                    <Table striped bordered hover>
+                      <thead>
+                        <tr>
+                          <th>Propositions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proposals !== null &&
+                          proposals.map((a) => <tr><td>{a.description}</td></tr>)
+                        }
+                      </tbody>
+                    </Table>
+                  </ListGroup.Item>
+                </ListGroup>
+              </Card.Body>
+            </Card>
+          </div>) }
+
+          { parseInt(status) === STATUS.VOTING && (<div><div style={{display: 'flex', justifyContent: 'center'}}>
+            <Card style={{ width: '50rem' }}>
+              <Card.Header><strong>Vote</strong></Card.Header>
+              <Card.Body>
+                <ListGroup variant="flush">
+                  <ListGroup.Item>
+                    <Table striped bordered hover>
+                      <thead>
+                        <tr>
+                          <th>Candidats</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proposals !== null &&
+                          proposals.map((a) => <tr><td>{a.description}</td></tr>)
+                        }
+                      </tbody>
+                    </Table>
+                  </ListGroup.Item>
+                </ListGroup>
+              </Card.Body>
+            </Card>
+          </div>
+          <div style={{display: 'flex', justifyContent: 'center'}}>
+            <Card style={{ width: '50rem' }}>
+              <Card.Header><strong>Enregistrez votre vote</strong></Card.Header>
+              <Card.Body>
+                <Form.Group controlId="formProposals">
+                  <Form.Control type="text" id="address"
+                  ref={(input) => { this.address = input }}
+                  />
+                </Form.Group>
+                <Button onClick={ this.vote } variant="dark" > Enregistrer </Button>
+              </Card.Body>
+            </Card>
+          </div></div>) }
+
+          { parseInt(status) === STATUS.END_VOTING && (<div style={{display: 'flex', justifyContent: 'center'}}>
+            <p className="text-center text-warning">Le vote est terminé. L'administrateur fait le décompte ...</p>
+          </div>) }
+
       </div>
     );
 
