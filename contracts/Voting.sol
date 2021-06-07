@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.12;
 import "@openzeppelin/contracts/access/Ownable.sol";
+pragma experimental ABIEncoderV2;
 
 contract Voting is Ownable {
     enum WorkflowStatus {
@@ -48,7 +49,7 @@ contract Voting is Ownable {
     function getProposalIdFromDescription(string memory _description) external view returns (uint) {
         uint id = 0;
         for(uint i=0; i<_proposalIds.length; i++) {
-            if (keccak256(abi.encodePacked((_proposals[_proposalIds[i]].description))) == keccak256(abi.encodePacked((_description)))) {
+            if (keccak256(abi.encodePacked(_proposals[_proposalIds[i]].description)) == keccak256(abi.encodePacked(_description))) {
                 id = _proposalIds[i];
                 break;
             }
@@ -61,12 +62,34 @@ contract Voting is Ownable {
         return addresses;
     }
 
-    function getProposals() external view returns(bytes32[] memory){
-        bytes32[] memory arrayProposals = new bytes32[](_proposalIds.length);
+        // TODO remove this (only DEBUG)
+    // function getAddressesWhoHasVoted() external view returns(address[] memory){
+    //     return addresses;
+    // }
+
+
+    // TODO getVoters(address) qui return un voter
+
+    function getProposals() external view returns(string[] memory){
+        string[] memory arrayProposals = new string[](_proposalIds.length);
         for(uint i=0; i<_proposalIds.length; i++) {
-            arrayProposals[i] = keccak256(abi.encodePacked((_proposals[_proposalIds[i]].description)));
+            arrayProposals[i] = _proposals[_proposalIds[i]].description;
         }        
         return arrayProposals;
+    }
+
+    function getWinner() external view returns(string memory) {
+        return _proposals[winningProposalId].description;
+    }
+
+    // function getWinner() external view returns(string memory) {
+    //     // require(winningProposalId != 0, "Error, there is no winner or the vote is not ended.");
+    //     return _proposals[winningProposalId].description;
+    // }
+
+    function getWinnerVoteCount() external view returns(uint) {
+        // require(winningProposalId != 0, "Error, there is no winner or the vote is not ended.");
+        return _proposals[winningProposalId].voteCount;
     }
 
     function tally() external onlyOwner {

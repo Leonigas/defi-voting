@@ -59,25 +59,42 @@ class App extends Component {
     }
   };
 
+  /**
+   * Met à jour les informations du votant arpès l'évèment VoterRegistered
+   */
+  updateVoter = async () => {
+    const { accounts, contract } = this.state;
+    const voter = await contract.methods._voters(accounts[0]).call()
+    this.setState({ voter: voter})
+  }
+
+  /**
+   * Met à jour les propositions après l'évènement ProposalRegistered 
+   */
+  updateProposals = async () => {
+    const { accounts, contract } = this.state;
+    const proposals = await contract.methods.getProposals().call()
+    this.setState({ proposals: proposals})
+  }
+
+  updateStatus = async () => {
+    const { contract } = this.state;
+    const status = await contract.methods.status().call()
+    const statusName = this.enumStatus[status].name
+    const statusColor = this.enumStatus[status].color
+    this.setState({ status: status, statusName: statusName, statusColor: statusColor })
+  }
+
   runInit = async () => {
     const { accounts, contract } = this.state;
 
+    // enregistrement des évènements
+    contract.events.VoterRegistered().on('data', (event) => this.updateVoter(event)).on('error', console.error);
+    contract.events.ProposalRegistered().on('data', (event) => this.updateProposals(event)).on('error', console.error);
+    contract.events.WorkflowStatusChange().on('data', (event) => this.updateStatus(event)).on('error', console.error);
+
     // récupérer les listes des votants et des propositions
     const voters = await contract.methods.getAddresses().call()  // TODO get _voters
-
-    console.log(voters)
-
-    // const proposals = await contract.methods.getProposals().call() // TODO get _proposals
-
-    // MOCK
-    const proposals = [{
-      'description': 'Macron',
-      'voteCount': 2
-    },
-    {
-      'description': 'Trump',
-      'voteCount': 1
-    }];
 
     // données relatives à la phase en cours
     const status = await contract.methods.status().call()
@@ -88,47 +105,60 @@ class App extends Component {
     const ownerAddress = await contract.methods.owner().call()
     const voter = await contract.methods._voters(accounts[0]).call()
 
-    console.log(voter)
-    console.log("STATUS : " , parseInt(status) )
+    //const _proposalIds = await contract.methods._proposalIds().call()
+    const proposals = await contract.methods.getProposals().call()  // TODO get _voters
 
-    const winningProposalId = await contract.methods.winningProposalId().call();
-      
+    const winningProposalId = await contract.methods.winningProposalId().call();  
+    const winner = await contract.methods.getWinner().call();
+    
     // Mettre à jour le state 
-    this.setState({ voters: voters, status: status, statusName: statusName, statusColor: statusColor, ownerAddress: ownerAddress, voter: voter, proposals: proposals, winningProposalId: winningProposalId})  
+    this.setState({ voters: voters, status: status, statusName: statusName, statusColor: statusColor, ownerAddress: ownerAddress, voter: voter, proposals: proposals, winningProposalId: winningProposalId, winner:winner})  
   }
 
+  /**
+   * Enregistre un nouveau votant
+   */
   registerVoter = async () => {
     const { accounts, contract } = this.state;
     const address = this.address.value;
 
     // Interaction avec le smart contract pour ajouter un compte 
     await contract.methods.registerVoter(address).send({from: accounts[0]});
-    // Récupérer la liste des comptes autorisés
-    this.runInit();
+
+    // Vide le champs input address
+    this.address.value = null;
   }
 
   registerProposal = async () => {
     const { accounts, contract } = this.state;
-    const address = this.address.value;
+    const proposal = this.proposal.value;
 
-    await contract.methods.registerProposal(address).send({from: accounts[0]});
-    this.runInit();
+    await contract.methods.registerProposal(proposal).send({from: accounts[0]});
+
+    // Vide le champs input proposal
+    this.proposal.value = null;
   }
 
   vote = async () => {
     const { accounts, contract } = this.state;
-    const address = this.address.value;
+    const vote = this.vote.value;
 
-    await contract.methods.vote(address).send({from: accounts[0]});
-    this.runInit();
+    await contract.methods.vote(vote).send({from: accounts[0]});
+    
+    // Vide le champs input proposal
+    this.vote.value = null;
   }
 
   tally = async () => {
     const { accounts, contract } = this.state;
 
     await contract.methods.tally().send({from: accounts[0]});
+    const winningProposalId = await contract.methods.winningProposalId().send({from: accounts[0]});
+    const winner = await contract.methods._proposals(winningProposalId).send({from: accounts[0]});
 
-    this.runInit();
+    console.log(winningProposalId, winner)
+
+    this.setState({ winner: winner })
   }
   
   nextStatus = async() => {
@@ -159,11 +189,11 @@ class App extends Component {
         break;
     }
 
-    this.runInit();
+    // this.runInit();
   }
 
   render() {
-    const { accounts, status, voters, statusColor, statusName, ownerAddress, voter, proposals, winningProposalId } = this.state;
+    const { accounts, status, voters, statusColor, statusName, ownerAddress, voter, proposals, winner } = this.state;
 
     if (accounts && accounts[0] === ownerAddress) {
       return (
@@ -231,7 +261,7 @@ class App extends Component {
                       </thead>
                       <tbody>
                         {proposals !== null &&
-                          proposals.map((a) => <tr><td>{a.description}</td></tr>)
+                          proposals.map((a) => <tr><td>{a}</td></tr>)
                         }
                       </tbody>
                     </Table>
@@ -275,10 +305,10 @@ class App extends Component {
 
           { parseInt(status) === STATUS.TALLY && (<div>
             <div style={{display: 'flex', justifyContent: 'center'}}>
-              <strong>Le gagnant est ...</strong>
+              <strong>Le gagnant est :</strong>
           </div>
           <div style={{display: 'flex', justifyContent: 'center'}}>
-            <h1>{ winningProposalId }</h1>
+            <h1>{ winner }</h1>
           </div>
           </div>) }
 
@@ -328,7 +358,7 @@ class App extends Component {
                       </thead>
                       <tbody>
                         {proposals !== null &&
-                          proposals.map((a) => <tr><td>{a.description}</td></tr>)
+                          proposals.map((a) => <tr><td>{a}</td></tr>)
                         }
                       </tbody>
                     </Table>
@@ -343,7 +373,7 @@ class App extends Component {
               <Card.Body>
                 <Form.Group controlId="formProposals">
                   <Form.Control type="text" id="address"
-                  ref={(input) => { this.address = input }}
+                  ref={(input) => { this.proposal = input }}
                   />
                 </Form.Group>
                 <Button onClick={ this.registerProposal } variant="dark" > Enregistrer </Button>
@@ -366,7 +396,7 @@ class App extends Component {
                       </thead>
                       <tbody>
                         {proposals !== null &&
-                          proposals.map((a) => <tr><td>{a.description}</td></tr>)
+                          proposals.map((a) => <tr><td>{a}</td></tr>)
                         }
                       </tbody>
                     </Table>
@@ -390,7 +420,7 @@ class App extends Component {
                       </thead>
                       <tbody>
                         {proposals !== null &&
-                          proposals.map((a) => <tr><td>{a.description}</td></tr>)
+                          proposals.map((a) => <tr key={a}><td>{a}</td></tr>)
                         }
                       </tbody>
                     </Table>
@@ -405,7 +435,7 @@ class App extends Component {
               <Card.Body>
                 <Form.Group controlId="formProposals">
                   <Form.Control type="text" id="address"
-                  ref={(input) => { this.address = input }}
+                  ref={(input) => { this.vote = input }}
                   />
                 </Form.Group>
                 <Button onClick={ this.vote } variant="dark" > Enregistrer </Button>
