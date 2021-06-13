@@ -3,10 +3,11 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
-import ListGroup from 'react-bootstrap/ListGroup';
-import Table from 'react-bootstrap/Table';
 import VotingContract from "./contracts/Voting.json";
 import getWeb3 from "./getWeb3";
+import ListProposals from "./components/ListProposals";
+import ListVoters from "./components/ListVoters";
+import Winner from "./components/Winner";
 
 import "./App.css";
 
@@ -23,12 +24,12 @@ class App extends Component {
   state = { web3: null, accounts: null, contract: null, voters: null };
 
   enumStatus = [
-    { name: "Enregistrement des électeurs", color: "#696969" },
-    { name: "Enregistrement des propositions", color: "#6495ED" },
-    { name: "Fin des propositions", color: "#008B8B" },
-    { name: "Début du vote", color: "#2F4F4F" },
-    { name: "Fin du vote", color: "#191970" },
-    { name: "Décompte fait", color: "#006400" }
+    { name: "Enregistrement des électeurs", color: "primary" },
+    { name: "Enregistrement des propositions", color: "secondary" },
+    { name: "Fin des propositions", color: "dark" },
+    { name: "Début du vote", color: "info" },
+    { name: "Fin du vote", color: "light" },
+    { name: "Décompte fait", color: "success" }
   ];
 
   componentDidMount = async () => {
@@ -62,17 +63,18 @@ class App extends Component {
   /**
    * Met à jour les informations du votant arpès l'évèment VoterRegistered
    */
-  updateVoter = async () => {
+  updateVoters = async () => {
     const { accounts, contract } = this.state;
     const voter = await contract.methods._voters(accounts[0]).call()
-    this.setState({ voter: voter})
+    const voters = await contract.methods.getAddresses().call()
+    this.setState({ voter: voter, voters: voters })
   }
 
   /**
    * Met à jour les propositions après l'évènement ProposalRegistered 
    */
   updateProposals = async () => {
-    const { accounts, contract } = this.state;
+    const { contract } = this.state;
     const proposals = await contract.methods.getProposals().call()
     this.setState({ proposals: proposals})
   }
@@ -85,34 +87,33 @@ class App extends Component {
     this.setState({ status: status, statusName: statusName, statusColor: statusColor })
   }
 
-  runInit = async () => {
-    const { accounts, contract } = this.state;
-
-    // enregistrement des évènements
-    contract.events.VoterRegistered().on('data', (event) => this.updateVoter(event)).on('error', console.error);
-    contract.events.ProposalRegistered().on('data', (event) => this.updateProposals(event)).on('error', console.error);
-    contract.events.WorkflowStatusChange().on('data', (event) => this.updateStatus(event)).on('error', console.error);
-
-    // récupérer les listes des votants et des propositions
-    const voters = await contract.methods.getAddresses().call()  // TODO get _voters
-
-    // données relatives à la phase en cours
-    const status = await contract.methods.status().call()
-    const statusName = this.enumStatus[status].name
-    const statusColor = this.enumStatus[status].color
-
-    // données personnelles
-    const ownerAddress = await contract.methods.owner().call()
-    const voter = await contract.methods._voters(accounts[0]).call()
-
-    //const _proposalIds = await contract.methods._proposalIds().call()
-    const proposals = await contract.methods.getProposals().call()  // TODO get _voters
+  updateWinner = async () => {
+    const { contract } = this.state;
 
     const winningProposalId = await contract.methods.winningProposalId().call();  
     const winner = await contract.methods.getWinner().call();
-    
+    this.setState({  winningProposalId: winningProposalId, winner:winner })
+  }
+
+  runInit = async () => {
+    const { contract } = this.state;
+
+    // enregistrement des évènements
+    contract.events.VoterRegistered().on('data', (event) => this.updateVoters(event)).on('error', console.error);
+    contract.events.ProposalRegistered().on('data', (event) => this.updateProposals(event)).on('error', console.error);
+    contract.events.WorkflowStatusChange().on('data', (event) => this.updateStatus(event)).on('error', console.error);
+    contract.events.VotesTallied().on('data', (event) => this.updateWinner(event)).on('error', console.error);
+
+    this.updateStatus() // met à jour le status
+    this.updateVoters() // liste des votants et status du votant
+    this.updateProposals() // liste des propositions
+    this.updateWinner() // informations sur le gagnant
+
+    // données personnelles
+    const ownerAddress = await contract.methods.owner().call()
+
     // Mettre à jour le state 
-    this.setState({ voters: voters, status: status, statusName: statusName, statusColor: statusColor, ownerAddress: ownerAddress, voter: voter, proposals: proposals, winningProposalId: winningProposalId, winner:winner})  
+    this.setState({ ownerAddress: ownerAddress })  
   }
 
   /**
@@ -151,16 +152,9 @@ class App extends Component {
 
   tally = async () => {
     const { accounts, contract } = this.state;
-
     await contract.methods.tally().send({from: accounts[0]});
-    const winningProposalId = await contract.methods.winningProposalId().send({from: accounts[0]});
-    const winner = await contract.methods._proposals(winningProposalId).send({from: accounts[0]});
-
-    console.log(winningProposalId, winner)
-
-    this.setState({ winner: winner })
   }
-  
+
   nextStatus = async() => {
     const { accounts, contract, status } = this.state;
 
@@ -188,8 +182,6 @@ class App extends Component {
       default:
         break;
     }
-
-    // this.runInit();
   }
 
   render() {
@@ -198,9 +190,8 @@ class App extends Component {
     if (accounts && accounts[0] === ownerAddress) {
       return (
         <div className="App">
-          <div style={{display: 'flex', justifyContent: 'center', color: "white", border: "1px solid "+statusColor, backgroundColor: statusColor}}>
-            <span style={{padding: "5px"}}>{ status + ' - ' + statusName }</span>
-            <Button style={{padding: "5px"}} onClick={ this.nextStatus } variant="light" > Suivant </Button>
+          <div className={"alert alert-" + statusColor +" fade show"}>
+            { statusName }
           </div>
 
           <div>
@@ -208,30 +199,15 @@ class App extends Component {
               <hr></hr>
               <br></br>
           </div>
-          
-          <div style={{display: 'flex', justifyContent: 'center'}}>
-            <Card style={{ width: '50rem' }}>
-              <Card.Header><strong>Liste des votants</strong></Card.Header>
-              <Card.Body>
-                <ListGroup variant="flush">
-                  <ListGroup.Item>
-                    <Table striped bordered hover>
-                      <thead>
-                        <tr>
-                          <th>@</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {voters !== null &&
-                          voters.map((a) => <tr><td>{a}</td></tr>)
-                        }
-                      </tbody>
-                    </Table>
-                  </ListGroup.Item>
-                </ListGroup>
-              </Card.Body>
-            </Card>
+
+          <div>
+          { parseInt(status) !== STATUS.TALLY && (
+              <button type="button" class="btn btn-primary" onClick={ this.nextStatus } variant="light" > Suivant </button>)}
           </div>
+          
+          <br></br>
+
+          <ListVoters voters= {voters}></ListVoters>
           <br></br>
           { parseInt(status) === STATUS.REG_VOTERS && (<div style={{display: 'flex', justifyContent: 'center'}}>
             <Card style={{ width: '50rem' }}>
@@ -247,53 +223,11 @@ class App extends Component {
             </Card>
           </div>) }
 
-          { parseInt(status) === STATUS.REG_PROPOSALS || parseInt(status) === STATUS.VOTING && (<div><div style={{display: 'flex', justifyContent: 'center'}}>
-            <Card style={{ width: '50rem' }}>
-              <Card.Header><strong>Liste des propositions</strong></Card.Header>
-              <Card.Body>
-                <ListGroup variant="flush">
-                  <ListGroup.Item>
-                    <Table striped bordered hover>
-                      <thead>
-                        <tr>
-                          <th>Propositions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {proposals !== null &&
-                          proposals.map((a) => <tr><td>{a}</td></tr>)
-                        }
-                      </tbody>
-                    </Table>
-                  </ListGroup.Item>
-                </ListGroup>
-              </Card.Body>
-            </Card>
-          </div></div>) }
+          { (parseInt(status) === STATUS.REG_PROPOSALS || parseInt(status) === STATUS.VOTING || parseInt(status) === STATUS.END_REG) && (<div>
+            <ListProposals proposals={proposals}></ListProposals>
+          </div>) }
 
-          { parseInt(status) === STATUS.END_VOTING && (<div><div style={{display: 'flex', justifyContent: 'center'}}>
-            <Card style={{ width: '50rem' }}>
-              <Card.Header><strong>Décompte</strong></Card.Header>
-              <Card.Body>
-                <ListGroup variant="flush">
-                  <ListGroup.Item>
-                    <Table striped bordered hover>
-                      <thead>
-                        <tr>
-                          <th>Propositions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {proposals !== null &&
-                          proposals.map((a) => <tr><td>{a.description} - {a.voteCount}</td></tr>)
-                        }
-                      </tbody>
-                    </Table>
-                  </ListGroup.Item>
-                </ListGroup>
-              </Card.Body>
-            </Card>
-          </div>
+          { parseInt(status) === STATUS.END_VOTING && (<div>
           <div style={{display: 'flex', justifyContent: 'center'}}>
             <Card style={{ width: '50rem' }}>
               <Card.Header><strong>Action</strong></Card.Header>
@@ -303,15 +237,7 @@ class App extends Component {
             </Card>
           </div></div>) }
 
-          { parseInt(status) === STATUS.TALLY && (<div>
-            <div style={{display: 'flex', justifyContent: 'center'}}>
-              <strong>Le gagnant est :</strong>
-          </div>
-          <div style={{display: 'flex', justifyContent: 'center'}}>
-            <h1>{ winner }</h1>
-          </div>
-          </div>) }
-
+          { parseInt(status) === STATUS.TALLY && (<Winner winner={winner}></Winner>) }
           <br></br>
         </div>
       );
@@ -323,8 +249,8 @@ class App extends Component {
 
     return (
       <div className="App">
-        <div style={{display: 'flex', justifyContent: 'center', color: "white", border: "1px solid "+statusColor, backgroundColor: statusColor}}>
-          <span style={{padding: "5px"}}>{ status + ' - ' + statusName }</span>
+          <div className={"alert alert-" + statusColor +" fade show"}>
+          { statusName }
         </div>
 
         <div>
@@ -333,120 +259,60 @@ class App extends Component {
           <br></br>
         </div>
 
-        { parseInt(status) === STATUS.REG_VOTERS && (<div style={{display: 'flex', justifyContent: 'center'}}>
-            <p className="text-center text-warning">L'administrateur est en train d'enregister les électeurs. Revenez plus tard ...</p>
-            <Card style={{ width: '50rem' }}>
-              <Card.Header><strong>Entregistrement</strong></Card.Header>
-              <Card.Body>
-                { voter && voter.isRegistered && (<p className='bg-success'>Vous êtes enregistré !</p>)}
-                { !voter || !voter.isRegistered && (<p className='bg-danger'>Vous n'êtes pas encore enregistré.</p>)}
-              </Card.Body>
-            </Card>
-          </div>) }
-
-          { parseInt(status) === STATUS.REG_PROPOSALS && (<div><div style={{display: 'flex', justifyContent: 'center'}}>
-            <Card style={{ width: '50rem' }}>
-              <Card.Header><strong>Liste des propositions</strong></Card.Header>
-              <Card.Body>
-                <ListGroup variant="flush">
-                  <ListGroup.Item>
-                    <Table striped bordered hover>
-                      <thead>
-                        <tr>
-                          <th>Propositions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {proposals !== null &&
-                          proposals.map((a) => <tr><td>{a}</td></tr>)
-                        }
-                      </tbody>
-                    </Table>
-                  </ListGroup.Item>
-                </ListGroup>
-              </Card.Body>
-            </Card>
-          </div>
-          <div style={{display: 'flex', justifyContent: 'center'}}>
-            <Card style={{ width: '50rem' }}>
-              <Card.Header><strong>Enregistrez votre proposition</strong></Card.Header>
-              <Card.Body>
-                <Form.Group controlId="formProposals">
-                  <Form.Control type="text" id="address"
-                  ref={(input) => { this.proposal = input }}
-                  />
-                </Form.Group>
-                <Button onClick={ this.registerProposal } variant="dark" > Enregistrer </Button>
-              </Card.Body>
-            </Card>
+        { parseInt(status) === STATUS.REG_VOTERS && (<div>
+            <div className="alert alert-info alert-dismissible fade show" role="alert">L'administrateur est en train d'enregister les électeurs. Revenez plus tard ...</div>
+            <div style={{display: 'flex', justifyContent: 'center'}}>
+              <Card style={{ width: '50rem' }}>
+                <Card.Header><strong>Entregistrement</strong></Card.Header>
+                <Card.Body>
+                  { voter && voter.isRegistered && (<p className='alert alert-success'>Vous êtes enregistré !</p>)}
+                  { (!voter || !voter.isRegistered) && (<p className='alert alert-danger'>Vous n'êtes pas encore enregistré.</p>)}
+                </Card.Body>
+              </Card>
           </div></div>) }
 
-          { parseInt(status) === STATUS.END_REG && (<div style={{display: 'flex', justifyContent: 'center'}}>
-            <p className="text-center text-warning">L'enregistrement des propositions est terminé. Revenez plus tard ...</p>
-            <Card style={{ width: '50rem' }}>
-              <Card.Header><strong>Liste des propositions</strong></Card.Header>
-              <Card.Body>
-                <ListGroup variant="flush">
-                  <ListGroup.Item>
-                    <Table striped bordered hover>
-                      <thead>
-                        <tr>
-                          <th>Propositions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {proposals !== null &&
-                          proposals.map((a) => <tr><td>{a}</td></tr>)
-                        }
-                      </tbody>
-                    </Table>
-                  </ListGroup.Item>
-                </ListGroup>
-              </Card.Body>
-            </Card>
-          </div>) }
+          { parseInt(status) === STATUS.REG_PROPOSALS && (<div>
+            <ListProposals proposals={proposals}></ListProposals>
+            <div style={{display: 'flex', justifyContent: 'center'}}>
+              <Card style={{ width: '50rem' }}>
+                <Card.Header><strong>Enregistrez votre proposition</strong></Card.Header>
+                <Card.Body>
+                  <Form.Group controlId="formProposals">
+                    <Form.Control type="text" id="address"
+                    ref={(input) => { this.proposal = input }}
+                    />
+                  </Form.Group>
+                  <Button onClick={ this.registerProposal } variant="dark" > Enregistrer </Button>
+                </Card.Body>
+              </Card>
+            </div></div>) }
 
-          { parseInt(status) === STATUS.VOTING && (<div><div style={{display: 'flex', justifyContent: 'center'}}>
-            <Card style={{ width: '50rem' }}>
-              <Card.Header><strong>Vote</strong></Card.Header>
-              <Card.Body>
-                <ListGroup variant="flush">
-                  <ListGroup.Item>
-                    <Table striped bordered hover>
-                      <thead>
-                        <tr>
-                          <th>Candidats</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {proposals !== null &&
-                          proposals.map((a) => <tr key={a}><td>{a}</td></tr>)
-                        }
-                      </tbody>
-                    </Table>
-                  </ListGroup.Item>
-                </ListGroup>
-              </Card.Body>
-            </Card>
-          </div>
-          <div style={{display: 'flex', justifyContent: 'center'}}>
-            <Card style={{ width: '50rem' }}>
-              <Card.Header><strong>Enregistrez votre vote</strong></Card.Header>
-              <Card.Body>
-                <Form.Group controlId="formProposals">
-                  <Form.Control type="text" id="address"
-                  ref={(input) => { this.vote = input }}
-                  />
-                </Form.Group>
-                <Button onClick={ this.vote } variant="dark" > Enregistrer </Button>
-              </Card.Body>
-            </Card>
-          </div></div>) }
+          { parseInt(status) === STATUS.END_REG && (<div>
+            <div className="alert alert-info alert-dismissible fade show" role="alert">L'enregistrement des propositions est terminé. Revenez plus tard ...</div>
+            <ListProposals proposals={proposals}></ListProposals>
+          </div>)}
+
+          { parseInt(status) === STATUS.VOTING && (<div>
+            <ListProposals proposals={proposals}></ListProposals>
+            <div style={{display: 'flex', justifyContent: 'center'}}>
+              <Card style={{ width: '50rem' }}>
+                <Card.Header><strong>Enregistrez votre vote</strong></Card.Header>
+                <Card.Body>
+                  <Form.Group controlId="formProposals">
+                    <Form.Control type="text" id="address"
+                    ref={(input) => { this.vote = input }}
+                    />
+                  </Form.Group>
+                  <Button onClick={ this.vote } variant="dark" > Enregistrer </Button>
+                </Card.Body>
+              </Card>
+            </div></div>)}
 
           { parseInt(status) === STATUS.END_VOTING && (<div style={{display: 'flex', justifyContent: 'center'}}>
-            <p className="text-center text-warning">Le vote est terminé. L'administrateur fait le décompte ...</p>
+            <div className="alert alert-success alert-dismissible fade show" role="alert">Le vote est terminé ! L'administrateur fait le décompte ...</div>
           </div>) }
 
+          { parseInt(status) === STATUS.TALLY && (<Winner winner={winner}></Winner>) }
       </div>
     );
 

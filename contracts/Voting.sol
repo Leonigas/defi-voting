@@ -24,7 +24,7 @@ contract Voting is Ownable {
     }
     mapping (uint => Proposal) public _proposals;
     mapping (address => Voter) public _voters;
-    address[] public addresses; // TODO remove this (only DEBUG)
+    address[] public addresses;
     uint[] _proposalIds;
     uint public winningProposalId;
     uint private nonce = 0;
@@ -57,18 +57,9 @@ contract Voting is Ownable {
         return id;
     }
     
-    // TODO remove this (only DEBUG)
     function getAddresses() external view returns(address[] memory){
         return addresses;
     }
-
-        // TODO remove this (only DEBUG)
-    // function getAddressesWhoHasVoted() external view returns(address[] memory){
-    //     return addresses;
-    // }
-
-
-    // TODO getVoters(address) qui return un voter
 
     function getProposals() external view returns(string[] memory){
         string[] memory arrayProposals = new string[](_proposalIds.length);
@@ -78,18 +69,8 @@ contract Voting is Ownable {
         return arrayProposals;
     }
 
-    function getWinner() external view returns(string memory) {
-        return _proposals[winningProposalId].description;
-    }
-
-    // function getWinner() external view returns(string memory) {
-    //     // require(winningProposalId != 0, "Error, there is no winner or the vote is not ended.");
-    //     return _proposals[winningProposalId].description;
-    // }
-
-    function getWinnerVoteCount() external view returns(uint) {
-        // require(winningProposalId != 0, "Error, there is no winner or the vote is not ended.");
-        return _proposals[winningProposalId].voteCount;
+    function getWinner() external view returns(string memory, uint) {
+        return (_proposals[winningProposalId].description, _proposals[winningProposalId].voteCount);
     }
 
     function tally() external onlyOwner {
@@ -132,7 +113,7 @@ contract Voting is Ownable {
         voter.isRegistered = true;
         voter.hasVoted = false;
         _voters[_address] = voter;
-        addresses.push(_address); // TODO remove this (only DEBUG)
+        addresses.push(_address);
         emit VoterRegistered(_address);
     }
     
