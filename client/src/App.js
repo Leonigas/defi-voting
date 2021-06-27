@@ -92,6 +92,9 @@ class App extends Component {
 
     const winningProposalId = await contract.methods.winningProposalId().call();  
     const winner = await contract.methods.getWinner().call();
+
+    console.log(winner)
+
     this.setState({  winningProposalId: winningProposalId, winner:winner })
   }
 
@@ -142,7 +145,7 @@ class App extends Component {
 
   vote = async () => {
     const { accounts, contract } = this.state;
-    const vote = this.vote.value;
+    const vote = this.vote_choice.value;
 
     await contract.methods.vote(vote).send({from: accounts[0]});
     
@@ -157,8 +160,6 @@ class App extends Component {
 
   nextStatus = async() => {
     const { accounts, contract, status } = this.state;
-
-    console.log("STATUS : " , parseInt(status) , STATUS.END_REG)
 
     switch(parseInt(status)) {
       case STATUS.REG_VOTERS:
@@ -223,7 +224,7 @@ class App extends Component {
             </Card>
           </div>) }
 
-          { (parseInt(status) === STATUS.REG_PROPOSALS || parseInt(status) === STATUS.VOTING || parseInt(status) === STATUS.END_REG) && (<div>
+          { (parseInt(status) === STATUS.REG_PROPOSALS || parseInt(status) === STATUS.VOTING || parseInt(status) === STATUS.END_REG) && proposals && (<div>
             <ListProposals proposals={proposals}></ListProposals>
           </div>) }
 
@@ -237,7 +238,7 @@ class App extends Component {
             </Card>
           </div></div>) }
 
-          { parseInt(status) === STATUS.TALLY && (<Winner winner={winner}></Winner>) }
+          { parseInt(status) === STATUS.TALLY && winner && (<Winner winner={winner}></Winner>) }
           <br></br>
         </div>
       );
@@ -271,8 +272,8 @@ class App extends Component {
               </Card>
           </div></div>) }
 
-          { parseInt(status) === STATUS.REG_PROPOSALS && (<div>
-            <ListProposals proposals={proposals}></ListProposals>
+          { parseInt(status) === STATUS.REG_PROPOSALS && proposals && (<div>
+            { <ListProposals proposals={proposals}></ListProposals> }
             <div style={{display: 'flex', justifyContent: 'center'}}>
               <Card style={{ width: '50rem' }}>
                 <Card.Header><strong>Enregistrez votre proposition</strong></Card.Header>
@@ -287,12 +288,12 @@ class App extends Component {
               </Card>
             </div></div>) }
 
-          { parseInt(status) === STATUS.END_REG && (<div>
+          { parseInt(status) === STATUS.END_REG  && proposals && (<div>
             <div className="alert alert-info alert-dismissible fade show" role="alert">L'enregistrement des propositions est terminé. Revenez plus tard ...</div>
             <ListProposals proposals={proposals}></ListProposals>
           </div>)}
 
-          { parseInt(status) === STATUS.VOTING && (<div>
+          { parseInt(status) === STATUS.VOTING && proposals && (<div>
             <ListProposals proposals={proposals}></ListProposals>
             <div style={{display: 'flex', justifyContent: 'center'}}>
               <Card style={{ width: '50rem' }}>
@@ -300,7 +301,7 @@ class App extends Component {
                 <Card.Body>
                   <Form.Group controlId="formProposals">
                     <Form.Control type="text" id="address"
-                    ref={(input) => { this.vote = input }}
+                    ref={(input) => { this.vote_choice = input }}
                     />
                   </Form.Group>
                   <Button onClick={ this.vote } variant="dark" > Enregistrer </Button>
@@ -312,7 +313,7 @@ class App extends Component {
             <div className="alert alert-success alert-dismissible fade show" role="alert">Le vote est terminé ! L'administrateur fait le décompte ...</div>
           </div>) }
 
-          { parseInt(status) === STATUS.TALLY && (<Winner winner={winner}></Winner>) }
+          { parseInt(status) === STATUS.TALLY && winner && (<Winner winner={winner}></Winner>) }
       </div>
     );
 

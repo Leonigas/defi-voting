@@ -15,9 +15,7 @@ class ListProposals extends React.Component {
                     <ListGroup.Item>
                     <Table striped bordered hover>
                         <tbody>
-                        {this.props.proposals !== null &&
-                            this.props.proposals.map((a) => <tr><td>{a}</td></tr>)
-                        }
+                        { this.props.proposals.map((a) => <tr><td>{a}</td></tr>) }
                         </tbody>
                     </Table>
                     </ListGroup.Item>

@@ -1,6 +1,6 @@
 // contracts/GameItem.sol
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.12;
+pragma solidity 0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 pragma experimental ABIEncoderV2;
 
