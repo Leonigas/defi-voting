@@ -73,9 +73,9 @@ contract Voting is Ownable {
         return (_proposals[winningProposalId].description, _proposals[winningProposalId].voteCount);
     }
 
-    function tally() external onlyOwner {
+    function tally() external view onlyOwner {
         require(status == WorkflowStatus.VotingSessionEnded, "Wait, this is not the time to tally !");
-        require(status != WorkflowStatus.VotesTallied, "Vote already tallied.");
+        // require(status != WorkflowStatus.VotesTallied, "Vote already tallied."); // pas utile
         
         uint max = 0;
         for(uint i=0; i<_proposalIds.length; i++) {
@@ -85,10 +85,27 @@ contract Voting is Ownable {
             }
         }
 
+        //
+        // Proposals : probleme deny de service DOS par rapport à la limite de gas (15 millions)
+        // Si on atteint la limite, la fonction ne pourra jamais être exécutée
+        // Le client peut mettre autant de proposals qu'il veut et faire un DOS sur cette function tally
+        // 
+        // 1 - autoriser 1 seul vote par user
+        //
+        // 2 - Ajouter un argument dans la fonction tally : index max 
+        // On fait une boucle for jusqu'à cet index
+        //
+        // 3 - mettre en fonction view
+        // retourner le vote qui a gagner sans modifier de données
+        //
+        // 4 - on peut faire le tally dans la function vote (c'est le client qui le fait dynamiquement)
+        // On a rien a faire ici du coup
+        //
+
         WorkflowStatus previousStatus = status;
         status = WorkflowStatus.VotesTallied;
         emit WorkflowStatusChange(previousStatus, status);
-        emit VotesTallied();   
+        emit VotesTallied();
     }
     
     function vote(string memory _description) external {
