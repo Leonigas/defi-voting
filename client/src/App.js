@@ -93,8 +93,6 @@ class App extends Component {
     const winningProposalId = await contract.methods.winningProposalId().call();  
     const winner = await contract.methods.getWinner().call();
 
-    console.log(winner)
-
     this.setState({  winningProposalId: winningProposalId, winner:winner })
   }
 
